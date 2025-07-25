@@ -27,4 +27,22 @@ MIN_API_REQUEST_INTERVAL = 1.0
 RATE_LIMIT_WARNING_THRESHOLD = 20
 
 # Critical rate limit threshold (when to significantly slow down)
-RATE_LIMIT_CRITICAL_THRESHOLD = 10 
+RATE_LIMIT_CRITICAL_THRESHOLD = 10
+
+# Webhook settings
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "localhost")
+WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
+WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
+
+# Build webhook URL - check if host already has protocol
+if WEBHOOK_HOST.startswith(('http://', 'https://')):
+    WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+else:
+    WEBHOOK_URL = f"https://{WEBHOOK_HOST}{WEBHOOK_PATH}"
+
+# Web app settings
+WEBAPP_HOST = os.getenv("WEBAPP_HOST", "0.0.0.0")
+WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", "8080"))
+
+# Development mode (skip webhook setup)
+DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true" 

@@ -53,9 +53,6 @@
 
 Використовуйте команду `/status` для моніторингу поточного стану лімітів.
 
-## Швидкий запуск
-
-Детальні інструкції для швидкого запуску дивіться у файлі [ЗАПУСК.md](ЗАПУСК.md)
 
 ## Встановлення
 
@@ -63,9 +60,32 @@
 2. Отримайте API токен Freelancehunt у [налаштуваннях профілю](https://freelancehunt.com/my/api)
 3. Створіть файл `.env` у корені проекту:
 
+### Для розробки:
 ```
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 FREELANCEHUNT_TOKEN=your_freelancehunt_api_token_here
+
+# Режим разработки (не устанавливать webhook)
+DEV_MODE=true
+
+# Веб-сервер настройки
+WEBAPP_HOST=0.0.0.0
+WEBAPP_PORT=8080
+```
+
+### Для продакшену:
+```
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+FREELANCEHUNT_TOKEN=your_freelancehunt_api_token_here
+
+# Webhook настройки
+WEBHOOK_HOST=https://your-domain.com
+WEBHOOK_PORT=443
+WEBHOOK_PATH=/webhook
+
+# Веб-сервер настройки
+WEBAPP_HOST=0.0.0.0
+WEBAPP_PORT=8080
 ```
 
 4. Встановіть залежності:
@@ -80,6 +100,25 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Режими роботи
+
+### Режим розробки (DEV_MODE=true)
+- Запускає веб-сервер без встановлення webhook
+- Підходить для локального тестування
+- Доступний health check на `/health`
+
+### Режим продакшену (DEV_MODE=false або не вказано)
+- Встановлює webhook на вказаний URL
+- Повна функціональність для продакшену
+
+## Налаштування Webhook
+
+**Важливо:** 
+- Для webhook потрібен HTTPS домен
+- Telegram підтримує тільки порти: 443, 80, 88, 8443
+- Переконайтеся, що ваш сервер доступний ззовні
+- Налаштуйте reverse proxy (nginx/apache) для проксирування HTTPS на ваш порт
+
 ## Вимоги
 
 - Python 3.7+
@@ -87,10 +126,3 @@ python main.py
 - aiohttp
 - python-dotenv
 
-## Структура проекту
-
-Проект має модульну архітектуру. Детальніше у [STRUCTURE.md](STRUCTURE.md)
-
-## Документація API
-
-Детальна інформація про фільтри API знаходиться у папці [Документація API](Документація%20API/) 
