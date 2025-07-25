@@ -16,6 +16,7 @@ from src.api.freelancehunt import api_client
 from src.api.rate_limiter import rate_limiter
 from src.utils.user_manager import user_manager
 from src.services.project_service import project_service
+from src.utils.db_manager import db_manager
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,15 @@ async def cmd_start(message: Message):
     """Handle /start command - activate project notifications."""
     user_id = message.from_user.id
     
-    # Activate user
-    user_manager.activate_user(user_id)
+    # Get user information
+    user_info = {
+        "first_name": message.from_user.first_name,
+        "last_name": message.from_user.last_name,
+        "username": message.from_user.username
+    }
+    
+    # Activate user with additional info
+    await user_manager.activate_user(user_id, user_info)
     
     await message.answer(
         "✅ Сповіщення про нові проекти активовано!\n\n"
@@ -52,7 +60,7 @@ async def cmd_stop(message: Message):
     """Handle /stop command - deactivate project notifications."""
     user_id = message.from_user.id
     
-    if user_manager.deactivate_user(user_id):
+    if await user_manager.deactivate_user(user_id):
         await message.answer("❌ Сповіщення про нові проекти зупинено.")
     else:
         await message.answer("Сповіщення вже зупинено.")
@@ -84,7 +92,7 @@ async def cmd_interval(message: Message, command: CommandObject):
             await message.answer(f"⚠️ Максимальний інтервал - {config.MAX_CHECK_INTERVAL} секунд.")
             interval = config.MAX_CHECK_INTERVAL
         
-        user_manager.set_user_interval(user_id, interval)
+        await user_manager.set_user_interval(user_id, interval)
         await message.answer(f"✅ Інтервал перевірки встановлено на {interval} секунд.")
         
     except ValueError:
@@ -125,7 +133,7 @@ async def handle_filter_callback(callback: CallbackQuery):
     
     # Clear all filters
     if parts[1] == "clear":
-        user_manager.clear_user_filters(user_id)
+        await user_manager.clear_user_filters(user_id)
         await callback.message.edit_text("✅ Фільтри скинуто. Будуть показані всі проекти.")
     else:
         filter_key = parts[1]
@@ -134,7 +142,7 @@ async def handle_filter_callback(callback: CallbackQuery):
         # Set the filter
         current_filters = user_manager.get_user_filters(user_id)
         current_filters[filter_key] = filter_value
-        user_manager.set_user_filters(user_id, current_filters)
+        await user_manager.set_user_filters(user_id, current_filters)
         
         await callback.message.edit_text(
             f"✅ Фільтр встановлено: {filter_key}={filter_value}\n\n"
@@ -172,7 +180,7 @@ async def cmd_skill_id(message: Message, command: CommandObject):
     # Set the filter
     current_filters = user_manager.get_user_filters(user_id)
     current_filters["skill_id"] = command.args
-    user_manager.set_user_filters(user_id, current_filters)
+    await user_manager.set_user_filters(user_id, current_filters)
     
     await message.answer(
         f"✅ Фільтр за навичками встановлено: skill_id={command.args}\n\n"
@@ -192,7 +200,7 @@ async def cmd_employer_id(message: Message, command: CommandObject):
     # Set the filter
     current_filters = user_manager.get_user_filters(user_id)
     current_filters["employer_id"] = command.args
-    user_manager.set_user_filters(user_id, current_filters)
+    await user_manager.set_user_filters(user_id, current_filters)
     
     await message.answer(
         f"✅ Фільтр за роботодавцем встановлено: employer_id={command.args}\n\n"
@@ -239,20 +247,51 @@ async def cmd_status(message: Message):
     current_interval = user_manager.get_user_interval(user_id)
     filter_desc = user_manager.get_filter_description(user_id)
     
+    # Get user details from database
+    user_details = await db_manager.get_user(user_id)
+    
+    # Format user details
+    created_at = user_details.get("created_at", "невідомо") if user_details else "немає в БД"
+    if isinstance(created_at, str):
+        created_at_str = created_at
+    else:
+        # Format datetime
+        created_at_str = created_at.strftime("%d.%m.%Y %H:%M:%S")
+    
+    # Get username from DB or current message
+    username = user_details.get("username") if user_details else None
+    if not username:
+        username = message.from_user.username or "не вказано"
+    
+    # Get user's name from DB or current message
+    if user_details and "first_name" in user_details:
+        first_name = user_details.get("first_name", "")
+        last_name = user_details.get("last_name", "")
+        name = f"{first_name} {last_name}".strip() or "не вказано"
+    else:
+        first_name = message.from_user.first_name or ""
+        last_name = message.from_user.last_name or ""
+        name = f"{first_name} {last_name}".strip() or "не вказано"
+    
     # Get rate limit status
     rate_status = rate_limiter.get_status()
     
     # Get stats
-    stats = user_manager.get_stats()
+    stats = await user_manager.get_stats()
+    new_users_24h = stats.get("new_users_24h", 0)
     
     status_text = (
         f"📊 <b>Статус бота</b>\n\n"
+        f"👤 <b>Користувач:</b> {name}\n"
+        f"🆔 <b>Username:</b> @{username}\n"
         f"🔔 Сповіщення: {'✅ Активні' if is_active else '❌ Зупинено'}\n"
         f"⏱ Інтервал перевірки: {current_interval} секунд\n"
-        f"🔍 Фільтр: {filter_desc}\n\n"
+        f"🔍 Фільтр: {filter_desc}\n"
+        f"📅 Дата реєстрації: {created_at_str}\n\n"
         f"📡 <b>API статус</b>\n"
         f"🚦 Rate limit: {rate_status}\n"
         f"👥 Активних користувачів: {stats['active_users']}\n"
+        f"👤 Нових користувачів за 24г: {new_users_24h}\n"
         f"📝 Надіслано проектів: {stats['sent_projects']}"
     )
     

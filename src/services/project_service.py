@@ -34,6 +34,10 @@ class ProjectService:
         self.is_running = True
         logger.info("Starting project monitoring service")
         
+        # Ensure user data is loaded from database
+        if not user_manager._loaded:
+            await user_manager.load_data_from_db()
+        
         while self.is_running:
             try:
                 await self._check_projects_for_all_users()
@@ -63,7 +67,7 @@ class ProjectService:
                 logger.error(f"Error checking projects for user {user_id}: {e}")
         
         # Clean up sent projects if list gets too large
-        user_manager.cleanup_sent_projects()
+        await user_manager.cleanup_sent_projects()
     
     async def _check_projects_for_user(self, user_id: int) -> None:
         """Check and send new projects for a specific user."""
@@ -98,7 +102,7 @@ class ProjectService:
             return
         
         # Mark project as sent
-        user_manager.add_sent_project(project_id)
+        await user_manager.add_sent_project(project_id)
         
         # Format and send message
         # Тимчасово відключено відображення skill_ids оскільки фільтр only_my_skills недоступний

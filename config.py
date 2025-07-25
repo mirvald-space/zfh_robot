@@ -18,6 +18,16 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 FREELANCEHUNT_TOKEN = os.getenv("FREELANCEHUNT_TOKEN")
 
 # ============================================================================
+# MONGODB SETTINGS
+# ============================================================================
+
+# MongoDB connection URI
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+
+# MongoDB database name
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "zfh_robot")
+
+# ============================================================================
 # PROJECT MONITORING SETTINGS
 # ============================================================================
 

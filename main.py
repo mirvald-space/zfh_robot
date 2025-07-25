@@ -29,6 +29,7 @@ from aiogram.exceptions import TelegramAPIError
 import config
 from src.handlers.commands import router
 from src.services.project_service import ProjectService
+from src.utils.db_manager import db_manager
 
 # Configure logging
 logging.basicConfig(
@@ -69,6 +70,7 @@ logger.info(f"WEBHOOK_URL: {config.WEBHOOK_URL}")
 logger.info(f"WEBAPP_PORT: {config.WEBAPP_PORT}")
 logger.info(f"Environment: {'Development' if config.DEV_MODE else 'Production'}")
 logger.info(f"DEV_MODE: {config.DEV_MODE}")
+logger.info(f"MongoDB: {config.MONGO_DB_NAME} on {config.MONGO_URI}")
 
 
 async def check_telegram_token():
@@ -97,6 +99,23 @@ async def check_freelancehunt_api():
         return False
 
 
+async def check_mongodb_connection():
+    """Перевіряє доступність MongoDB"""
+    try:
+        # Connect to database
+        await db_manager.connect()
+        
+        # Test connection with a simple command
+        if db_manager.db is not None:
+            await db_manager.db.command("ping")
+            
+        logger.info("Successfully connected to MongoDB")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to connect to MongoDB: {e}")
+        return False
+
+
 async def on_startup(bot: Bot) -> None:
     """Дії при запуску бота"""
     try:
@@ -104,9 +123,17 @@ async def on_startup(bot: Bot) -> None:
         if not await check_telegram_token():
             raise ValueError("Invalid Telegram token")
         
+        # Check MongoDB connection
+        if not await check_mongodb_connection():
+            raise ValueError("Failed to connect to MongoDB")
+        
         # Check Freelancehunt API connection
         if not await check_freelancehunt_api():
             raise ValueError("Failed to connect to Freelancehunt API")
+        
+        # Load data from database
+        from src.utils.user_manager import user_manager
+        await user_manager.load_data_from_db()
         
         # Set webhook only in production mode
         if not config.DEV_MODE:
@@ -134,6 +161,10 @@ async def on_shutdown(bot: Bot) -> None:
         # Stop project monitoring
         project_service_instance.stop_monitoring()
         logger.info("Project monitoring stopped")
+        
+        # Close MongoDB connection
+        await db_manager.close()
+        logger.info("MongoDB connection closed")
         
         # Close bot session
         await bot.session.close()
@@ -177,24 +208,76 @@ async def get_freelancehunt_status():
         }
 
 
+async def get_mongodb_status():
+    """Перевіряє статус MongoDB"""
+    try:
+        if db_manager.db is None:
+            await db_manager.connect()
+            
+        # Simple query to check connection
+        await db_manager.db.command("ping")
+        
+        # Get collection statistics
+        users_count = await db_manager.db.users.count_documents({})
+        active_users_count = await db_manager.db.users.count_documents({"active": True})
+        users_with_username = await db_manager.db.users.count_documents({"username": {"$ne": None}})
+        projects_count = await db_manager.db.sent_projects.count_documents({})
+        
+        # Get new users in last 24 hours
+        import datetime
+        yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+        new_users_count = await db_manager.db.users.count_documents({
+            "created_at": {"$gte": yesterday}
+        })
+        
+        # Get additional info
+        stats = {
+            "connected": True,
+            "database": config.MONGO_DB_NAME,
+            "collections": {
+                "users": {
+                    "total": users_count,
+                    "active": active_users_count,
+                    "with_username": users_with_username,
+                    "new_24h": new_users_count
+                },
+                "sent_projects": projects_count
+            }
+        }
+        
+        return {
+            "ok": True,
+            **stats
+        }
+    except Exception as e:
+        logger.error(f"MongoDB status check failed: {e}")
+        return {
+            "ok": False,
+            "connected": False,
+            "error": str(e)
+        }
+
+
 async def health_check(request: Request) -> web.Response:
     """Розширений health check з інформацією про стан сервісів"""
     try:
         # Collect status of all services
         freelancehunt_status = await get_freelancehunt_status()
         bot_status = await get_bot_status()
+        mongodb_status = await get_mongodb_status()
         
         # Calculate uptime
         uptime = int(time.time() - START_TIME)
         
         health_data = {
-            "status": "ok" if freelancehunt_status["ok"] and bot_status["ok"] else "error",
+            "status": "ok" if freelancehunt_status["ok"] and bot_status["ok"] and mongodb_status["ok"] else "error",
             "timestamp": time.time(),
             "uptime_seconds": uptime,
             "environment": "development" if config.DEV_MODE else "production",
             "services": {
                 "freelancehunt_api": freelancehunt_status,
                 "telegram_bot": bot_status,
+                "mongodb": mongodb_status,
                 "project_monitoring": {
                     "ok": True,
                     "active": project_service_instance is not None
