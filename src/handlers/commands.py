@@ -273,9 +273,6 @@ async def cmd_status(message: Message):
         last_name = message.from_user.last_name or ""
         name = f"{first_name} {last_name}".strip() or "не вказано"
     
-    # Get rate limit status
-    rate_status = rate_limiter.get_status()
-    
     # Get stats
     stats = await user_manager.get_stats()
     new_users_24h = stats.get("new_users_24h", 0)
@@ -288,8 +285,7 @@ async def cmd_status(message: Message):
         f"⏱ Інтервал перевірки: {current_interval} секунд\n"
         f"🔍 Фільтр: {filter_desc}\n"
         f"📅 Дата реєстрації: {created_at_str}\n\n"
-        f"📡 <b>API статус</b>\n"
-        f"🚦 Rate limit: {rate_status}\n"
+        f"📡 <b>Загальна статистика</b>\n"
         f"👥 Активних користувачів: {stats['active_users']}\n"
         f"👤 Нових користувачів за 24г: {new_users_24h}\n"
         f"📝 Надіслано проектів: {stats['sent_projects']}"

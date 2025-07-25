@@ -15,7 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 class RateLimitManager:
-    """Manages API rate limiting to prevent HTTP 429 errors."""
+    """
+    Manages API rate limiting to prevent HTTP 429 errors.
+    
+    Freelancehunt API does not explicitly document their rate limits.
+    This manager implements a conservative approach using default values
+    and adaptive behavior based on response headers if available.
+    
+    Default rate limit is set to 30 requests per minute, which is a 
+    common practice for many REST APIs.
+    """
     
     def __init__(self):
         self.limit: Optional[int] = None
@@ -24,19 +33,71 @@ class RateLimitManager:
         self.min_interval_between_requests = config.MIN_API_REQUEST_INTERVAL
         
     def update_from_headers(self, headers: Dict[str, str]) -> None:
-        """Update rate limit info from API response headers."""
+        """
+        Update rate limit info from API response headers.
+        
+        Tries to find rate limit headers in different formats and casings:
+        - X-Ratelimit-Limit / X-Ratelimit-Remaining
+        - X-Rate-Limit-Limit / X-Rate-Limit-Remaining
+        or other variations that might contain 'ratelimit' in the header name.
+        """
         try:
-            if 'X-Ratelimit-Limit' in headers:
-                self.limit = int(headers['X-Ratelimit-Limit'])
-            if 'X-Ratelimit-Remaining' in headers:
-                self.remaining = int(headers['X-Ratelimit-Remaining'])
+            # Check for various header casings and formats
+            limit_found = False
+            remaining_found = False
+            
+            # Check all headers for rate limit information
+            for header, value in headers.items():
+                header_lower = header.lower()
                 
-            logger.info(f"Rate limit updated: {self.remaining}/{self.limit} remaining")
-        except (ValueError, TypeError) as e:
+                # Try to find limit header
+                if 'x-ratelimit-limit' in header_lower:
+                    try:
+                        self.limit = int(value)
+                        limit_found = True
+                    except (ValueError, TypeError):
+                        pass
+                    
+                # Try to find remaining header
+                if 'x-ratelimit-remaining' in header_lower:
+                    try:
+                        self.remaining = int(value)
+                        remaining_found = True
+                    except (ValueError, TypeError):
+                        pass
+                    
+                # Some APIs use different header formats
+                if 'x-rate-limit-limit' in header_lower and not limit_found:
+                    try:
+                        self.limit = int(value)
+                        limit_found = True
+                    except (ValueError, TypeError):
+                        pass
+                    
+                if 'x-rate-limit-remaining' in header_lower and not remaining_found:
+                    try:
+                        self.remaining = int(value)
+                        remaining_found = True
+                    except (ValueError, TypeError):
+                        pass
+            
+            if limit_found or remaining_found:
+                logger.info(f"Rate limit updated: {self.remaining}/{self.limit} remaining")
+            else:
+                logger.warning("No rate limit headers found in response")
+                
+        except Exception as e:
             logger.warning(f"Failed to parse rate limit headers: {e}")
     
     async def wait_if_needed(self) -> None:
-        """Wait if necessary to respect rate limits."""
+        """
+        Wait if necessary to respect rate limits.
+        
+        Implements an adaptive waiting strategy:
+        1. Always wait minimum interval between requests
+        2. If remaining requests are below warning threshold, wait longer
+        3. If remaining requests are below critical threshold, wait even longer
+        """
         now = datetime.now()
         
         # Always wait minimum interval between requests
@@ -68,9 +129,17 @@ class RateLimitManager:
     
     def get_status(self) -> str:
         """Get current rate limit status as string."""
-        if self.limit and self.remaining is not None:
-            return f"{self.remaining}/{self.limit} requests remaining"
-        return "Rate limit status unknown"
+        if self.limit is not None and self.remaining is not None:
+            # Calculate percentage
+            percentage = (self.remaining / self.limit) * 100 if self.limit > 0 else 0
+            status_emoji = "✅" if percentage > 50 else "⚠️" if percentage > 20 else "🚫"
+            return f"{status_emoji} {self.remaining}/{self.limit} запросов ({percentage:.0f}%)"
+        elif self.limit is not None:
+            return f"Лимит: {self.limit} запросов (осталось: неизвестно)"
+        elif self.remaining is not None:
+            return f"Осталось {self.remaining} запросов (лимит: неизвестно)"
+        else:
+            return "Используются стандартные лимиты API (30 запросов/мин)"
 
 
 # Global rate limit manager instance

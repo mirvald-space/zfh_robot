@@ -28,7 +28,15 @@ class FreelancehuntAPI:
         }
     
     async def _make_request(self, endpoint: str, params: Dict[str, str] = None) -> Dict[str, Any]:
-        """Make a request to Freelancehunt API with rate limiting."""
+        """
+        Make a request to Freelancehunt API with rate limiting.
+        
+        Note on rate limits:
+        Freelancehunt API does not explicitly document rate limits in their API documentation.
+        Based on common practices and experience with similar APIs, we're using a conservative 
+        default of 30 requests per minute. The API may return actual rate limit information 
+        in response headers, but if not, we'll use these defaults.
+        """
         # Check rate limits before making request
         if rate_limiter.should_skip_request():
             logger.warning(f"Skipping request to {endpoint} due to rate limit")
@@ -48,10 +56,54 @@ class FreelancehuntAPI:
             try:
                 async with session.get(url, headers=self.headers) as response:
                     # Update rate limit info from response headers
-                    rate_limiter.update_from_headers(dict(response.headers))
+                    headers_dict = dict(response.headers)
+                    
+                    # Debugging: log the headers received
+                    logger.info(f"API response headers: {headers_dict}")
+                    
+                    # Check for different header casings
+                    ratelimit_headers = {}
+                    for header_name, header_value in headers_dict.items():
+                        header_lower = header_name.lower()
+                        if 'ratelimit' in header_lower:
+                            ratelimit_headers[header_name] = header_value
+                    
+                    # If we found some rate limit headers, log them
+                    if ratelimit_headers:
+                        logger.info(f"Rate limit headers found: {ratelimit_headers}")
+                    
+                    rate_limiter.update_from_headers(headers_dict)
                     
                     if response.status == 200:
-                        return await response.json()
+                        # Get the response data
+                        response_data = await response.json()
+                        
+                        # Check if rate limit info is in the response body
+                        # Some APIs include rate limit in a "meta" field
+                        if "meta" in response_data:
+                            meta = response_data.get("meta", {})
+                            if "ratelimit" in meta or "rate_limit" in meta:
+                                rate_limit_info = meta.get("ratelimit", {}) or meta.get("rate_limit", {})
+                                logger.info(f"Rate limit info from body: {rate_limit_info}")
+                                
+                                # Update rate limiter from body data
+                                if "limit" in rate_limit_info and "remaining" in rate_limit_info:
+                                    try:
+                                        limit_value = int(rate_limit_info["limit"])
+                                        remaining_value = int(rate_limit_info["remaining"])
+                                        rate_limiter.limit = limit_value
+                                        rate_limiter.remaining = remaining_value
+                                        logger.info(f"Updated rate limits from body: {remaining_value}/{limit_value}")
+                                    except (ValueError, TypeError) as e:
+                                        logger.warning(f"Failed to parse rate limit from body: {e}")
+                        
+                        # If we still don't have rate limit info, set default values
+                        if rate_limiter.limit is None:
+                            rate_limiter.limit = 30  # Default per minute based on common API practices
+                            rate_limiter.remaining = 29  # Conservative default
+                            logger.info("Using default rate limit values (30 requests/minute)")
+                        
+                        return response_data
                     elif response.status == 429:
                         logger.error("Rate limit exceeded (HTTP 429)")
                         rate_limiter.remaining = 0
