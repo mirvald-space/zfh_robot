@@ -62,7 +62,7 @@ WEBHOOK_PATH=/webhook
 
 # Налаштування додатку
 WEBAPP_HOST=0.0.0.0
-WEBAPP_PORT=8080
+WEBAPP_PORT=3000
 
 # Режим розробки (true для локальної розробки)
 DEV_MODE=false

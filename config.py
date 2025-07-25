@@ -67,7 +67,7 @@ else:
 WEBAPP_HOST = os.getenv("WEBAPP_HOST", "0.0.0.0")
 
 # Web app port
-WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", "8080"))
+WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", "3000"))
 
 # ============================================================================
 # ENVIRONMENT SETTINGS

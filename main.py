@@ -89,7 +89,7 @@ async def check_freelancehunt_api():
         from src.api.freelancehunt import FreelancehuntAPI
         api = FreelancehuntAPI()
         # Try to make a simple API call to check connectivity
-        await api.get_projects(limit=1)
+        await api.get_projects()
         logger.info("Successfully connected to Freelancehunt API")
         return True
     except Exception as e:
@@ -165,7 +165,7 @@ async def get_freelancehunt_status():
         from src.api.freelancehunt import FreelancehuntAPI
         api = FreelancehuntAPI()
         # Simple API call to check connectivity
-        await api.get_projects(limit=1)
+        await api.get_projects()
         return {
             "ok": True,
             "connected": True
