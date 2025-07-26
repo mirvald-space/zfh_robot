@@ -74,6 +74,10 @@ class DatabaseManager:
         existing_user = await collection.find_one({"user_id": user_id})
         
         if existing_user:
+            # Сохраняем список отправленных проектов, если он существует
+            if 'sent_projects' in existing_user and 'sent_projects' not in user_data:
+                user_data['sent_projects'] = existing_user['sent_projects']
+                
             # Update existing user - don't modify created_at
             await collection.update_one(
                 {"user_id": user_id},
@@ -81,8 +85,10 @@ class DatabaseManager:
             )
             logger.info(f"Updated user {user_id} in database")
         else:
-            # Insert new user with created_at timestamp
+            # Insert new user with created_at timestamp and empty sent_projects array
             user_data["created_at"] = datetime.datetime.now()
+            if 'sent_projects' not in user_data:
+                user_data['sent_projects'] = []
             await collection.insert_one(user_data)
             logger.info(f"Added user {user_id} to database with creation timestamp")
         
@@ -198,7 +204,7 @@ class DatabaseManager:
     
     async def add_sent_project(self, project_id: int, user_id: int) -> None:
         """
-        Add project to sent projects collection with user ID.
+        Add project to user's sent_projects list.
         
         Args:
             project_id: Freelancehunt project ID
@@ -207,28 +213,15 @@ class DatabaseManager:
         if self.db is None:
             await self.connect()
         
-        collection = self.db.sent_projects
+        collection = self.db.users
         
-        # Найдем запись о проекте
-        project_doc = await collection.find_one({"project_id": project_id})
+        # Добавляем проект в массив sent_projects, если такого проекта еще нет
+        await collection.update_one(
+            {"user_id": user_id},
+            {"$addToSet": {"sent_projects": project_id}}
+        )
         
-        if project_doc:
-            # Если запись существует, добавляем user_id в список, если его еще нет
-            user_ids = project_doc.get("user_ids", [])
-            if user_id not in user_ids:
-                user_ids.append(user_id)
-                await collection.update_one(
-                    {"project_id": project_id},
-                    {"$set": {"user_ids": user_ids, "last_updated": datetime.datetime.now()}}
-                )
-        else:
-            # Если записи не существует, создаем новую с user_id в списке
-            await collection.insert_one({
-                "project_id": project_id,
-                "user_ids": [user_id],
-                "timestamp": datetime.datetime.now(),
-                "last_updated": datetime.datetime.now()
-            })
+        logger.info(f"Project {project_id} added to sent projects for user {user_id}")
     
     async def is_project_sent(self, project_id: int, user_id: int) -> bool:
         """
@@ -244,69 +237,48 @@ class DatabaseManager:
         if self.db is None:
             await self.connect()
         
-        collection = self.db.sent_projects
+        collection = self.db.users
         result = await collection.find_one({
-            "project_id": project_id,
-            "user_ids": {"$in": [user_id]}
+            "user_id": user_id,
+            "sent_projects": project_id
         })
         
         return result is not None
     
-    async def cleanup_sent_projects(self, limit: int = 1000) -> None:
+    async def cleanup_user_sent_projects(self, user_id: int, keep_count: int = 500) -> None:
         """
-        Clean up old sent projects, keeping only the newest ones.
-        
-        Args:
-            limit: Number of projects to keep
-        """
-        if self.db is None:
-            await self.connect()
-        
-        collection = self.db.sent_projects
-        
-        # Count total documents
-        count = await collection.count_documents({})
-        
-        if count > limit:
-            # Get all project IDs sorted by project_id (newer IDs are larger)
-            cursor = collection.find().sort("project_id", 1)
-            
-            # Calculate how many to delete
-            to_delete = count - limit
-            
-            # Get IDs to delete
-            delete_ids = []
-            async for doc in cursor.limit(to_delete):
-                delete_ids.append(doc["project_id"])
-            
-            # Delete old projects
-            if delete_ids:
-                await collection.delete_many({"project_id": {"$in": delete_ids}})
-                logger.info(f"Cleaned up {len(delete_ids)} old sent projects")
-                
-    async def cleanup_user_sent_projects(self, user_id: int, project_ids: List[int]) -> None:
-        """
-        Remove user from list of recipients for specified projects.
+        Clean up old sent projects for a user, keeping only the newest ones.
         
         Args:
             user_id: Telegram user ID
-            project_ids: List of project IDs to clean up
+            keep_count: Number of most recent projects to keep
         """
         if self.db is None:
             await self.connect()
         
-        collection = self.db.sent_projects
+        collection = self.db.users
         
-        # Удаляем пользователя из списка получателей проектов
-        await collection.update_many(
-            {"project_id": {"$in": project_ids}, "user_ids": user_id},
-            {"$pull": {"user_ids": user_id}}
-        )
+        # Get user document
+        user = await collection.find_one({"user_id": user_id})
+        if not user or "sent_projects" not in user:
+            return
+            
+        sent_projects = user.get("sent_projects", [])
         
-        # Удаляем проекты, у которых не осталось получателей
-        await collection.delete_many({"user_ids": {"$size": 0}})
-        
-        logger.info(f"Cleaned up {len(project_ids)} sent projects for user {user_id}")
+        # If there are too many projects, keep only the newest ones
+        # (assuming newer projects have higher IDs)
+        if len(sent_projects) > keep_count:
+            # Sort by ID in descending order and keep the most recent ones
+            sent_projects.sort(reverse=True)
+            new_sent_projects = sent_projects[:keep_count]
+            
+            # Update the user document
+            await collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"sent_projects": new_sent_projects}}
+            )
+            
+            logger.info(f"Cleaned up sent projects for user {user_id}, kept {keep_count} most recent")
 
 
 # Global database manager instance

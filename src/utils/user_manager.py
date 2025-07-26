@@ -23,7 +23,6 @@ class UserManager:
         self.active_users: Set[int] = set()
         self.user_filters: Dict[int, Dict[str, str]] = {}
         self.user_intervals: Dict[int, int] = {}
-        # Меняем структуру на словарь {user_id: set(project_ids)}
         self.user_sent_projects: Dict[int, Set[int]] = {}
         self._loaded = False
         
@@ -54,26 +53,13 @@ class UserManager:
                 # Get user interval
                 if 'interval' in user:
                     self.user_intervals[user_id] = user['interval']
-            
-            # Load sent projects
-            if db_manager.db is not None:
-                projects_cursor = db_manager.db.sent_projects.find()
-                async for project in projects_cursor:
-                    project_id = project['project_id']
-                    # Если в документе есть поле user_ids, используем его
-                    if 'user_ids' in project:
-                        user_ids = project['user_ids']
-                        for user_id in user_ids:
-                            if user_id not in self.user_sent_projects:
-                                self.user_sent_projects[user_id] = set()
-                            self.user_sent_projects[user_id].add(project_id)
-                    # Иначе используем старый формат - общий для всех пользователей
-                    else:
-                        for user_id in self.active_users:
-                            if user_id not in self.user_sent_projects:
-                                self.user_sent_projects[user_id] = set()
-                            self.user_sent_projects[user_id].add(project_id)
                 
+                # Get sent projects
+                if 'sent_projects' in user:
+                    self.user_sent_projects[user_id] = set(user['sent_projects'])
+                else:
+                    self.user_sent_projects[user_id] = set()
+            
             # Подсчет общего количества отправленных проектов
             total_sent_projects = sum(len(projects) for projects in self.user_sent_projects.values())
             logger.info(f"Loaded {len(self.active_users)} active users, {total_sent_projects} sent projects")
@@ -85,6 +71,10 @@ class UserManager:
     async def save_user_to_db(self, user_id: int, user_data: Dict[str, Any]) -> None:
         """Save user data to database."""
         try:
+            # Если у нас есть отправленные проекты в памяти, добавим их в данные пользователя
+            if user_id in self.user_sent_projects and 'sent_projects' not in user_data:
+                user_data['sent_projects'] = list(self.user_sent_projects[user_id])
+                
             await db_manager.add_user(user_data)
             
         except Exception as e:
@@ -121,7 +111,8 @@ class UserManager:
             'user_id': user_id,
             'active': True,
             'interval': self.user_intervals.get(user_id, config.DEFAULT_CHECK_INTERVAL),
-            'filters': self.user_filters.get(user_id, {})
+            'filters': self.user_filters.get(user_id, {}),
+            'sent_projects': list(self.user_sent_projects.get(user_id, set()))
         }
         
         # Add additional user information if provided
@@ -262,14 +253,10 @@ class UserManager:
                 # Обновляем множество отправленных проектов
                 self.user_sent_projects[user_id] = set(sent_projects_list[:keep_size])
                 
-                # Получаем проекты для удаления
-                projects_to_delete = sent_projects_list[keep_size:]
+                # Обновляем в базе данных
+                await db_manager.cleanup_user_sent_projects(user_id, keep_size)
                 
-                # Удаляем из базы данных записи об отправке этих проектов пользователю
-                if projects_to_delete:
-                    await db_manager.cleanup_user_sent_projects(user_id, projects_to_delete)
-                    
-                    logger.info(f"Cleaned up sent projects for user {user_id}, kept {keep_size} latest")
+                logger.info(f"Cleaned up sent projects for user {user_id}, kept {keep_size} latest")
     
     def get_min_user_interval(self) -> int:
         """Get minimum interval among all active users."""
