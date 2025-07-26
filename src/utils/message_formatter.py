@@ -52,13 +52,25 @@ class MessageFormatter:
     
     @staticmethod
     def format_employer_name(employer: Dict[str, Any]) -> str:
-        """Format employer name."""
+        """Format employer name with login."""
         if not employer:
             return ""
         
         first_name = employer.get('first_name', '')
         last_name = employer.get('last_name', '')
-        return f"{first_name} {last_name}".strip()
+        login = employer.get('login', '')
+        
+        # Build name
+        name = f"{first_name} {last_name}".strip()
+        
+        # Add login if available
+        if login:
+            if name:
+                return f"{name} (@{login})"
+            else:
+                return f"@{login}"
+        
+        return name if name else ""
     
     @staticmethod
     def get_project_url(project: Dict[str, Any]) -> str:
@@ -125,7 +137,7 @@ class MessageFormatter:
         if employer_name:
             message_text += f"<b>Замовник:</b> {employer_name}\n"
         
-        message_text += f"\n<a href='{project_url}'>Відкрити проект</a>"
+        message_text += f"\n<b>🔗 <a href='{project_url}'>Відкрити проект</a></b>"
         
         return message_text
 

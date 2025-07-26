@@ -130,7 +130,12 @@ class ProjectService:
         
         try:
             logger.info(f"Sending project {project_id} to user {user_id}")
-            await self.bot.send_message(user_id, message_text)
+            await self.bot.send_message(
+                user_id, 
+                message_text, 
+                parse_mode='HTML',
+                disable_web_page_preview=True
+            )
             logger.info(f"Successfully sent project {project_id} to user {user_id}")
         except Exception as e:
             logger.error(f"Failed to send message to user {user_id}: {e}", exc_info=True)

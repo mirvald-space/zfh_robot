@@ -30,7 +30,7 @@ async def cmd_debug_sent(message: Message):
     
     # Check if user is active
     if not user_manager.is_user_active(user_id):
-        await message.answer("❌ Спочатку активуйте бота командою /start")
+        await message.answer("❌ Спочатку активуйте бота командою /start", parse_mode='HTML', disable_web_page_preview=True)
         return
     
     # Get sent projects for this user
@@ -40,7 +40,7 @@ async def cmd_debug_sent(message: Message):
     # Get projects from API for comparison
     projects = await api_client.get_projects()
     if not projects:
-        await message.answer("❌ Не вдалося отримати проекти з API")
+        await message.answer("❌ Не вдалося отримати проекти з API", parse_mode='HTML', disable_web_page_preview=True)
         return
     
     # Count how many current projects are marked as sent to this user
@@ -68,7 +68,7 @@ async def cmd_debug_sent(message: Message):
             is_sent = "✅" if project_id in user_sent_projects else "❌"
             report += f"{i+1}. {is_sent} ID {project_id}: {name[:30]}...\n"
     
-    await message.answer(report)
+    await message.answer(report, parse_mode='HTML', disable_web_page_preview=True)
 
 
 @router.message(Command("start"))
@@ -94,7 +94,9 @@ async def cmd_start(message: Message):
         "/filter - обрати фільтр проектів\n"
         "/interval &lt;секунди&gt; - змінити інтервал перевірки\n"
         "/status - статус бота та API\n"
-        "/stop - зупинити сповіщення"
+        "/stop - зупинити сповіщення",
+        parse_mode='HTML',
+        disable_web_page_preview=True
     )
     
     # Start the monitoring service if not already running
@@ -109,9 +111,9 @@ async def cmd_stop(message: Message):
     user_id = message.from_user.id
     
     if await user_manager.deactivate_user(user_id):
-        await message.answer("❌ Сповіщення про нові проекти зупинено.")
+        await message.answer("❌ Сповіщення про нові проекти зупинено.", parse_mode='HTML', disable_web_page_preview=True)
     else:
-        await message.answer("Сповіщення вже зупинено.")
+        await message.answer("Сповіщення вже зупинено.", parse_mode='HTML', disable_web_page_preview=True)
 
 
 @router.message(Command("interval"))
@@ -125,7 +127,9 @@ async def cmd_interval(message: Message, command: CommandObject):
             f"Поточний інтервал перевірки: {current_interval} секунд\n"
             f"Для зміни використовуйте команду /interval &lt;секунди&gt;\n"
             f"Мінімальний інтервал: {config.MIN_CHECK_INTERVAL} секунд\n"
-            f"Максимальний інтервал: {config.MAX_CHECK_INTERVAL} секунд"
+            f"Максимальний інтервал: {config.MAX_CHECK_INTERVAL} секунд",
+            parse_mode='HTML',
+            disable_web_page_preview=True
         )
         return
     
@@ -134,17 +138,17 @@ async def cmd_interval(message: Message, command: CommandObject):
         
         # Validate and set interval
         if interval < config.MIN_CHECK_INTERVAL:
-            await message.answer(f"⚠️ Мінімальний інтервал - {config.MIN_CHECK_INTERVAL} секунд.")
+            await message.answer(f"⚠️ Мінімальний інтервал - {config.MIN_CHECK_INTERVAL} секунд.", parse_mode='HTML', disable_web_page_preview=True)
             interval = config.MIN_CHECK_INTERVAL
         elif interval > config.MAX_CHECK_INTERVAL:
-            await message.answer(f"⚠️ Максимальний інтервал - {config.MAX_CHECK_INTERVAL} секунд.")
+            await message.answer(f"⚠️ Максимальний інтервал - {config.MAX_CHECK_INTERVAL} секунд.", parse_mode='HTML', disable_web_page_preview=True)
             interval = config.MAX_CHECK_INTERVAL
         
         await user_manager.set_user_interval(user_id, interval)
-        await message.answer(f"✅ Інтервал перевірки встановлено на {interval} секунд.")
+        await message.answer(f"✅ Інтервал перевірки встановлено на {interval} секунд.", parse_mode='HTML', disable_web_page_preview=True)
         
     except ValueError:
-        await message.answer("❌ Помилка! Вкажіть число в секундах, наприклад: /interval 120")
+        await message.answer("❌ Помилка! Вкажіть число в секундах, наприклад: /interval 120", parse_mode='HTML', disable_web_page_preview=True)
 
 
 @router.message(Command("filter"))
@@ -165,7 +169,9 @@ async def cmd_filter(message: Message):
     
     await message.answer(
         "Оберіть фільтр для проектів:",
-        reply_markup=builder.as_markup()
+        reply_markup=builder.as_markup(),
+        parse_mode='HTML',
+        disable_web_page_preview=True
     )
 
 
@@ -182,7 +188,7 @@ async def handle_filter_callback(callback: CallbackQuery):
     # Clear all filters
     if parts[1] == "clear":
         await user_manager.clear_user_filters(user_id)
-        await callback.message.edit_text("✅ Фільтри скинуто. Будуть показані всі проекти.")
+        await callback.message.edit_text("✅ Фільтри скинуто. Будуть показані всі проекти.", parse_mode='HTML', disable_web_page_preview=True)
     else:
         filter_key = parts[1]
         filter_value = parts[2] if len(parts) > 2 else ""
@@ -194,7 +200,9 @@ async def handle_filter_callback(callback: CallbackQuery):
         
         await callback.message.edit_text(
             f"✅ Фільтр встановлено: {filter_key}={filter_value}\n\n"
-            f"Поточні фільтри: {user_manager.get_filter_description(user_id)}"
+            f"Поточні фільтри: {user_manager.get_filter_description(user_id)}",
+            parse_mode='HTML',
+            disable_web_page_preview=True
         )
     
     await callback.answer()
@@ -211,7 +219,9 @@ async def handle_input_callback(callback: CallbackQuery):
         f"- Для skill_id: 69,99 (через кому)\n"
         f"- Для employer_id: 123\n\n"
         f"Надішліть повідомлення у форматі:\n"
-        f"/{filter_key} значення"
+        f"/{filter_key} значення",
+        parse_mode='HTML',
+        disable_web_page_preview=True
     )
     await callback.answer()
 
@@ -222,7 +232,7 @@ async def cmd_skill_id(message: Message, command: CommandObject):
     user_id = message.from_user.id
     
     if not command.args:
-        await message.answer("Вкажіть ID навичок через кому, наприклад: /skill_id 69,99")
+        await message.answer("Вкажіть ID навичок через кому, наприклад: /skill_id 69,99", parse_mode='HTML', disable_web_page_preview=True)
         return
     
     # Set the filter
@@ -232,7 +242,9 @@ async def cmd_skill_id(message: Message, command: CommandObject):
     
     await message.answer(
         f"✅ Фільтр за навичками встановлено: skill_id={command.args}\n\n"
-        f"Поточні фільтри: {user_manager.get_filter_description(user_id)}"
+        f"Поточні фільтри: {user_manager.get_filter_description(user_id)}",
+        parse_mode='HTML',
+        disable_web_page_preview=True
     )
 
 
@@ -242,7 +254,7 @@ async def cmd_employer_id(message: Message, command: CommandObject):
     user_id = message.from_user.id
     
     if not command.args:
-        await message.answer("Вкажіть ID роботодавця, наприклад: /employer_id 123")
+        await message.answer("Вкажіть ID роботодавця, наприклад: /employer_id 123", parse_mode='HTML', disable_web_page_preview=True)
         return
     
     # Set the filter
@@ -252,7 +264,9 @@ async def cmd_employer_id(message: Message, command: CommandObject):
     
     await message.answer(
         f"✅ Фільтр за роботодавцем встановлено: employer_id={command.args}\n\n"
-        f"Поточні фільтри: {user_manager.get_filter_description(user_id)}"
+        f"Поточні фільтри: {user_manager.get_filter_description(user_id)}",
+        parse_mode='HTML',
+        disable_web_page_preview=True
     )
 
 
@@ -339,4 +353,4 @@ async def cmd_status(message: Message):
         f"📝 Надіслано проектів: {stats['sent_projects']}"
     )
     
-    await message.answer(status_text)
+    await message.answer(status_text, parse_mode='HTML', disable_web_page_preview=True)
