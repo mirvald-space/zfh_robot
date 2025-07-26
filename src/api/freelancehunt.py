@@ -58,19 +58,16 @@ class FreelancehuntAPI:
                     # Update rate limit info from response headers
                     headers_dict = dict(response.headers)
                     
-                    # Debugging: log the headers received
-                    logger.info(f"API response headers: {headers_dict}")
-                    
-                    # Check for different header casings
+                    # Check for rate limit headers only, without logging all headers
                     ratelimit_headers = {}
                     for header_name, header_value in headers_dict.items():
                         header_lower = header_name.lower()
                         if 'ratelimit' in header_lower:
                             ratelimit_headers[header_name] = header_value
                     
-                    # If we found some rate limit headers, log them
+                    # Only log if we found relevant headers
                     if ratelimit_headers:
-                        logger.info(f"Rate limit headers found: {ratelimit_headers}")
+                        logger.debug(f"Rate limit headers found: {ratelimit_headers}")
                     
                     rate_limiter.update_from_headers(headers_dict)
                     
@@ -84,7 +81,7 @@ class FreelancehuntAPI:
                             meta = response_data.get("meta", {})
                             if "ratelimit" in meta or "rate_limit" in meta:
                                 rate_limit_info = meta.get("ratelimit", {}) or meta.get("rate_limit", {})
-                                logger.info(f"Rate limit info from body: {rate_limit_info}")
+                                logger.debug(f"Rate limit info from body: {rate_limit_info}")
                                 
                                 # Update rate limiter from body data
                                 if "limit" in rate_limit_info and "remaining" in rate_limit_info:
@@ -93,7 +90,7 @@ class FreelancehuntAPI:
                                         remaining_value = int(rate_limit_info["remaining"])
                                         rate_limiter.limit = limit_value
                                         rate_limiter.remaining = remaining_value
-                                        logger.info(f"Updated rate limits from body: {remaining_value}/{limit_value}")
+                                        logger.debug(f"Updated rate limits from body: {remaining_value}/{limit_value}")
                                     except (ValueError, TypeError) as e:
                                         logger.warning(f"Failed to parse rate limit from body: {e}")
                         
@@ -101,7 +98,7 @@ class FreelancehuntAPI:
                         if rate_limiter.limit is None:
                             rate_limiter.limit = 30  # Default per minute based on common API practices
                             rate_limiter.remaining = 29  # Conservative default
-                            logger.info("Using default rate limit values (30 requests/minute)")
+                            logger.debug("Using default rate limit values (30 requests/minute)")
                         
                         return response_data
                     elif response.status == 429:
@@ -147,10 +144,6 @@ class FreelancehuntAPI:
         projects = data.get("data", [])
         
         logger.info(f"Received {len(projects)} projects from API")
-        
-        # Log the first project structure for debugging
-        if projects and len(projects) > 0:
-            logger.info(f"Sample project structure: {json.dumps(projects[0], indent=2, ensure_ascii=False)[:500]}...")
         
         return projects
     

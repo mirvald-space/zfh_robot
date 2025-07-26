@@ -144,6 +144,8 @@ async def on_startup(bot: Bot) -> None:
         
         # Start project monitoring
         logger.info("Project monitoring service initialized")
+        # Start monitoring in background
+        asyncio.create_task(project_service_instance.start_monitoring())
         
     except Exception as e:
         logger.error(f"Startup failed: {e}")

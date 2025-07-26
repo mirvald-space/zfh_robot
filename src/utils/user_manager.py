@@ -23,7 +23,8 @@ class UserManager:
         self.active_users: Set[int] = set()
         self.user_filters: Dict[int, Dict[str, str]] = {}
         self.user_intervals: Dict[int, int] = {}
-        self.sent_projects: Set[int] = set()
+        # Меняем структуру на словарь {user_id: set(project_ids)}
+        self.user_sent_projects: Dict[int, Set[int]] = {}
         self._loaded = False
         
     async def load_data_from_db(self) -> None:
@@ -58,9 +59,24 @@ class UserManager:
             if db_manager.db is not None:
                 projects_cursor = db_manager.db.sent_projects.find()
                 async for project in projects_cursor:
-                    self.sent_projects.add(project['project_id'])
+                    project_id = project['project_id']
+                    # Если в документе есть поле user_ids, используем его
+                    if 'user_ids' in project:
+                        user_ids = project['user_ids']
+                        for user_id in user_ids:
+                            if user_id not in self.user_sent_projects:
+                                self.user_sent_projects[user_id] = set()
+                            self.user_sent_projects[user_id].add(project_id)
+                    # Иначе используем старый формат - общий для всех пользователей
+                    else:
+                        for user_id in self.active_users:
+                            if user_id not in self.user_sent_projects:
+                                self.user_sent_projects[user_id] = set()
+                            self.user_sent_projects[user_id].add(project_id)
                 
-            logger.info(f"Loaded {len(self.active_users)} active users, {len(self.sent_projects)} sent projects")
+            # Подсчет общего количества отправленных проектов
+            total_sent_projects = sum(len(projects) for projects in self.user_sent_projects.values())
+            logger.info(f"Loaded {len(self.active_users)} active users, {total_sent_projects} sent projects")
             self._loaded = True
             
         except Exception as e:
@@ -95,6 +111,10 @@ class UserManager:
         # Set empty filter if not set
         if user_id not in self.user_filters:
             self.user_filters[user_id] = {}
+            
+        # Инициализация списка отправленных проектов для пользователя, если он не существует
+        if user_id not in self.user_sent_projects:
+            self.user_sent_projects[user_id] = set()
         
         # Prepare user data for database
         user_data = {
@@ -186,20 +206,45 @@ class UserManager:
         
         logger.info(f"User {user_id} filters cleared")
     
-    async def add_sent_project(self, project_id: int) -> None:
-        """Mark project as sent."""
+    async def add_sent_project(self, project_id: int, user_id: int) -> None:
+        """
+        Mark project as sent to specific user.
+        
+        Args:
+            project_id: Freelancehunt project ID
+            user_id: Telegram user ID
+        """
         # Ensure data is loaded
         if not self._loaded:
             await self.load_data_from_db()
             
-        self.sent_projects.add(project_id)
+        # Инициализация множества отправленных проектов для пользователя, если не существует
+        if user_id not in self.user_sent_projects:
+            self.user_sent_projects[user_id] = set()
+            
+        self.user_sent_projects[user_id].add(project_id)
         
         # Update in database
-        await db_manager.add_sent_project(project_id)
+        await db_manager.add_sent_project(project_id, user_id)
+        
+        logger.info(f"Project {project_id} marked as sent to user {user_id}")
     
-    def is_project_sent(self, project_id: int) -> bool:
-        """Check if project was already sent."""
-        return project_id in self.sent_projects
+    def is_project_sent(self, project_id: int, user_id: int) -> bool:
+        """
+        Check if project was already sent to specific user.
+        
+        Args:
+            project_id: Freelancehunt project ID
+            user_id: Telegram user ID
+        
+        Returns:
+            True if project was sent to user, False otherwise
+        """
+        # Если у пользователя нет списка отправленных проектов, значит проект не отправлялся
+        if user_id not in self.user_sent_projects:
+            return False
+            
+        return project_id in self.user_sent_projects[user_id]
     
     async def cleanup_sent_projects(self, max_size: int = 1000, keep_size: int = 500) -> None:
         """Clean up sent projects if list gets too large."""
@@ -207,17 +252,24 @@ class UserManager:
         if not self._loaded:
             await self.load_data_from_db()
             
-        if len(self.sent_projects) > max_size:
-            # Keep only the latest project IDs
-            sent_projects_list = list(self.sent_projects)
-            sent_projects_list.sort(reverse=True)
-            self.sent_projects.clear()
-            self.sent_projects.update(sent_projects_list[:keep_size])
-            
-            # Clean up in database
-            await db_manager.cleanup_sent_projects(keep_size)
-            
-            logger.info(f"Cleaned up sent projects, kept {keep_size} latest")
+        # Очистка для каждого пользователя отдельно
+        for user_id, projects in self.user_sent_projects.items():
+            if len(projects) > max_size:
+                # Keep only the latest project IDs
+                sent_projects_list = list(projects)
+                sent_projects_list.sort(reverse=True)
+                
+                # Обновляем множество отправленных проектов
+                self.user_sent_projects[user_id] = set(sent_projects_list[:keep_size])
+                
+                # Получаем проекты для удаления
+                projects_to_delete = sent_projects_list[keep_size:]
+                
+                # Удаляем из базы данных записи об отправке этих проектов пользователю
+                if projects_to_delete:
+                    await db_manager.cleanup_user_sent_projects(user_id, projects_to_delete)
+                    
+                    logger.info(f"Cleaned up sent projects for user {user_id}, kept {keep_size} latest")
     
     def get_min_user_interval(self) -> int:
         """Get minimum interval among all active users."""
@@ -255,11 +307,14 @@ class UserManager:
         if not self._loaded:
             await self.load_data_from_db()
         
+        # Подсчет общего количества отправленных проектов
+        total_sent_projects = sum(len(projects) for projects in self.user_sent_projects.values())
+        
         # Get basic stats
         stats = {
             "active_users": len(self.active_users),
             "total_users": len(self.user_intervals),
-            "sent_projects": len(self.sent_projects)
+            "sent_projects": total_sent_projects
         }
         
         # Try to get additional stats from database

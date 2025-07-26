@@ -23,6 +23,54 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
+@router.message(Command("debug_sent"))
+async def cmd_debug_sent(message: Message):
+    """Debug command to check sent projects status."""
+    user_id = message.from_user.id
+    
+    # Check if user is active
+    if not user_manager.is_user_active(user_id):
+        await message.answer("❌ Спочатку активуйте бота командою /start")
+        return
+    
+    # Get sent projects for this user
+    user_sent_projects = user_manager.user_sent_projects.get(user_id, set())
+    sent_count = len(user_sent_projects)
+    
+    # Get projects from API for comparison
+    projects = await api_client.get_projects()
+    if not projects:
+        await message.answer("❌ Не вдалося отримати проекти з API")
+        return
+    
+    # Count how many current projects are marked as sent to this user
+    api_project_ids = [p.get("id") for p in projects]
+    sent_api_projects = [pid for pid in api_project_ids if pid in user_sent_projects]
+    
+    # Calculate total sent projects across all users
+    total_sent_projects = sum(len(projects) for projects in user_manager.user_sent_projects.values())
+    
+    # Generate report
+    report = (
+        f"📊 <b>Діагностика відправлених проектів</b>\n\n"
+        f"Загальна кількість відправлених проектів (всім користувачам): {total_sent_projects}\n"
+        f"Проектів відправлено вам: {sent_count}\n"
+        f"Кількість отриманих проектів з API: {len(projects)}\n"
+        f"З них відмічено як відправлені вам: {len(sent_api_projects)}\n\n"
+    )
+    
+    # Add information about the first 5 projects
+    if projects:
+        report += "<b>Останні проекти:</b>\n"
+        for i, project in enumerate(projects[:5]):
+            project_id = project.get("id")
+            name = project.get("attributes", {}).get("name", "Без назви")
+            is_sent = "✅" if project_id in user_sent_projects else "❌"
+            report += f"{i+1}. {is_sent} ID {project_id}: {name[:30]}...\n"
+    
+    await message.answer(report)
+
+
 @router.message(Command("start"))
 async def cmd_start(message: Message):
     """Handle /start command - activate project notifications."""

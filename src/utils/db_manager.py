@@ -1,74 +1,76 @@
 """
-MongoDB database manager.
+Database manager.
 
-Provides functionality for database operations and connection management.
+Handles database connections and CRUD operations.
 """
 
 import logging
 import datetime
 from typing import Dict, List, Any, Optional
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+
 import config
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseManager:
-    """MongoDB database manager."""
+    """Handles database operations."""
     
     def __init__(self):
         """Initialize database manager."""
-        self.client: Optional[AsyncIOMotorClient] = None
+        self.client = None
         self.db: Optional[AsyncIOMotorDatabase] = None
-        
+    
     async def connect(self) -> None:
-        """Connect to MongoDB database."""
+        """
+        Connect to MongoDB database.
+        
+        Creates a connection to MongoDB using the URI from config.
+        """
         try:
-            # Create MongoDB client
-            self.client = AsyncIOMotorClient(config.MONGO_URI, serverSelectionTimeoutMS=5000)
+            # Create client
+            self.client = AsyncIOMotorClient(config.MONGO_URI)
             
-            # Test connection
-            await self.client.admin.command('ping')
-            
-            # Set database
+            # Get database
             self.db = self.client[config.MONGO_DB_NAME]
             
             logger.info(f"Connected to MongoDB: {config.MONGO_DB_NAME}")
-            
         except Exception as e:
-            logger.error(f"MongoDB connection error: {e}")
-            self.client = None
-            self.db = None
+            logger.error(f"Error connecting to MongoDB: {e}")
             raise
     
     async def close(self) -> None:
-        """Close MongoDB connection."""
-        if self.client:
+        """
+        Close MongoDB connection.
+        """
+        if self.client is not None:
             self.client.close()
+            self.client = None
+            self.db = None
             logger.info("MongoDB connection closed")
     
     async def add_user(self, user_data: Dict[str, Any]) -> str:
         """
-        Add a new user to the database or update if exists.
+        Add user to database or update if exists.
         
         Args:
             user_data: User data dictionary
             
         Returns:
-            User ID as string
+            User ID
         """
         if self.db is None:
             await self.connect()
         
         collection = self.db.users
+        user_id = user_data.get('user_id')
         
-        # Ensure user_id is present
-        if 'user_id' not in user_data:
-            raise ValueError("user_id is required")
-        
-        user_id = user_data['user_id']
-        
-        # Try to find user first
+        if not user_id:
+            logger.error("User data is missing user_id")
+            return ""
+            
+        # Check if user exists
         existing_user = await collection.find_one({"user_id": user_id})
         
         if existing_user:
@@ -88,7 +90,7 @@ class DatabaseManager:
     
     async def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
-        Get user from database by user_id.
+        Get user from database by ID.
         
         Args:
             user_id: Telegram user ID
@@ -106,23 +108,21 @@ class DatabaseManager:
     
     async def update_user(self, user_id: int, update_data: Dict[str, Any]) -> bool:
         """
-        Update user document with new data.
+        Update user in database.
         
         Args:
             user_id: Telegram user ID
             update_data: Data to update
             
         Returns:
-            True if successful, False otherwise
+            True if user was updated, False otherwise
         """
         if self.db is None:
             await self.connect()
         
         collection = self.db.users
-        
         # Add last_updated field
         update_data["last_updated"] = datetime.datetime.now()
-        
         result = await collection.update_one(
             {"user_id": user_id},
             {"$set": update_data}
@@ -131,8 +131,8 @@ class DatabaseManager:
         if result.modified_count > 0:
             logger.info(f"Updated user {user_id} in database")
             return True
-        
-        logger.warning(f"User {user_id} update had no effect")
+            
+        logger.warning(f"User {user_id} not found for update")
         return False
     
     async def delete_user(self, user_id: int) -> bool:
@@ -143,7 +143,7 @@ class DatabaseManager:
             user_id: Telegram user ID
             
         Returns:
-            True if successful, False if user not found
+            True if user was deleted, False otherwise
         """
         if self.db is None:
             await self.connect()
@@ -196,40 +196,59 @@ class DatabaseManager:
         
         return users
     
-    async def add_sent_project(self, project_id: int) -> None:
+    async def add_sent_project(self, project_id: int, user_id: int) -> None:
         """
-        Add project to sent projects collection.
+        Add project to sent projects collection with user ID.
         
         Args:
             project_id: Freelancehunt project ID
+            user_id: Telegram user ID who received the project
         """
         if self.db is None:
             await self.connect()
         
         collection = self.db.sent_projects
         
-        # Use upsert to ensure we don't have duplicates
-        await collection.update_one(
-            {"project_id": project_id},
-            {"$set": {"project_id": project_id, "timestamp": datetime.datetime.now()}},
-            upsert=True
-        )
+        # Найдем запись о проекте
+        project_doc = await collection.find_one({"project_id": project_id})
+        
+        if project_doc:
+            # Если запись существует, добавляем user_id в список, если его еще нет
+            user_ids = project_doc.get("user_ids", [])
+            if user_id not in user_ids:
+                user_ids.append(user_id)
+                await collection.update_one(
+                    {"project_id": project_id},
+                    {"$set": {"user_ids": user_ids, "last_updated": datetime.datetime.now()}}
+                )
+        else:
+            # Если записи не существует, создаем новую с user_id в списке
+            await collection.insert_one({
+                "project_id": project_id,
+                "user_ids": [user_id],
+                "timestamp": datetime.datetime.now(),
+                "last_updated": datetime.datetime.now()
+            })
     
-    async def is_project_sent(self, project_id: int) -> bool:
+    async def is_project_sent(self, project_id: int, user_id: int) -> bool:
         """
-        Check if project was already sent.
+        Check if project was already sent to specific user.
         
         Args:
             project_id: Freelancehunt project ID
+            user_id: Telegram user ID
             
         Returns:
-            True if project was sent, False otherwise
+            True if project was sent to user, False otherwise
         """
         if self.db is None:
             await self.connect()
         
         collection = self.db.sent_projects
-        result = await collection.find_one({"project_id": project_id})
+        result = await collection.find_one({
+            "project_id": project_id,
+            "user_ids": {"$in": [user_id]}
+        })
         
         return result is not None
     
@@ -264,6 +283,30 @@ class DatabaseManager:
             if delete_ids:
                 await collection.delete_many({"project_id": {"$in": delete_ids}})
                 logger.info(f"Cleaned up {len(delete_ids)} old sent projects")
+                
+    async def cleanup_user_sent_projects(self, user_id: int, project_ids: List[int]) -> None:
+        """
+        Remove user from list of recipients for specified projects.
+        
+        Args:
+            user_id: Telegram user ID
+            project_ids: List of project IDs to clean up
+        """
+        if self.db is None:
+            await self.connect()
+        
+        collection = self.db.sent_projects
+        
+        # Удаляем пользователя из списка получателей проектов
+        await collection.update_many(
+            {"project_id": {"$in": project_ids}, "user_ids": user_id},
+            {"$pull": {"user_ids": user_id}}
+        )
+        
+        # Удаляем проекты, у которых не осталось получателей
+        await collection.delete_many({"user_ids": {"$size": 0}})
+        
+        logger.info(f"Cleaned up {len(project_ids)} sent projects for user {user_id}")
 
 
 # Global database manager instance

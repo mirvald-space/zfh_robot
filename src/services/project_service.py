@@ -38,11 +38,17 @@ class ProjectService:
         if not user_manager._loaded:
             await user_manager.load_data_from_db()
         
+        # Сразу запускаем первую проверку проектов, не ждем таймера
+        logger.info("Running initial project check")
+        await self._check_projects_for_all_users()
+        
+        logger.info("Starting periodic project monitoring loop")
+        
         while self.is_running:
             try:
                 await self._check_projects_for_all_users()
             except Exception as e:
-                logger.error(f"Error in project monitoring loop: {e}")
+                logger.error(f"Error in project monitoring loop: {e}", exc_info=True)
             
             # Calculate smart interval and wait
             await self._wait_smart_interval()
@@ -55,16 +61,22 @@ class ProjectService:
     async def _check_projects_for_all_users(self) -> None:
         """Check for new projects for all active users."""
         # Skip if there are no active users
-        if not user_manager.active_users:
+        active_users = user_manager.active_users
+        active_users_count = len(active_users)
+        
+        logger.info(f"Found {active_users_count} active users to notify about new projects")
+        
+        if not active_users:
+            logger.info("No active users found, waiting 10s before next check")
             await asyncio.sleep(10)  # Wait for users to become active
             return
         
         # Check for each active user with their filters
-        for user_id in user_manager.active_users.copy():  # Copy to avoid modification during iteration
+        for user_id in active_users.copy():  # Copy to avoid modification during iteration
             try:
                 await self._check_projects_for_user(user_id)
             except Exception as e:
-                logger.error(f"Error checking projects for user {user_id}: {e}")
+                logger.error(f"Error checking projects for user {user_id}: {e}", exc_info=True)
         
         # Clean up sent projects if list gets too large
         await user_manager.cleanup_sent_projects()
@@ -77,7 +89,10 @@ class ProjectService:
         # Get projects from API
         projects = await api_client.get_projects(user_filters)
         if not projects:
+            logger.warning(f"No projects received from API for user {user_id}")
             return
+        
+        logger.info(f"Processing {len(projects)} projects for user {user_id}")
         
         # Тимчасово відключено отримання навичок користувача
         # оскільки фільтр only_my_skills працює тільки з персональним ключем
@@ -95,14 +110,18 @@ class ProjectService:
         """Process a single project for a user."""
         project_id = project.get("id")
         
+        logger.info(f"Processing project {project_id} for user {user_id}")
+        
         # Check if project should be processed
         if not project_checker.should_process_project(
-            project, user_filters, user_skills, user_manager.sent_projects
+            project, user_filters, user_skills, user_id, user_manager.user_sent_projects
         ):
+            logger.info(f"Project {project_id} not suitable for user {user_id}, skipping")
             return
         
-        # Mark project as sent
-        await user_manager.add_sent_project(project_id)
+        # Mark project as sent to this user
+        logger.info(f"Adding project {project_id} to sent projects for user {user_id}")
+        await user_manager.add_sent_project(project_id, user_id)
         
         # Format and send message
         # Тимчасово відключено відображення skill_ids оскільки фільтр only_my_skills недоступний
@@ -110,14 +129,16 @@ class ProjectService:
         message_text = message_formatter.format_project_message(project, show_skill_ids)
         
         try:
+            logger.info(f"Sending project {project_id} to user {user_id}")
             await self.bot.send_message(user_id, message_text)
-            logger.info(f"Sent project {project_id} to user {user_id}")
+            logger.info(f"Successfully sent project {project_id} to user {user_id}")
         except Exception as e:
-            logger.error(f"Failed to send message to user {user_id}: {e}")
+            logger.error(f"Failed to send message to user {user_id}: {e}", exc_info=True)
     
     async def _wait_smart_interval(self) -> None:
         """Wait for the calculated smart interval."""
         if not user_manager.active_users:
+            logger.debug("No active users, using short interval")
             await asyncio.sleep(10)
             return
         
@@ -130,7 +151,7 @@ class ProjectService:
             rate_limiter.remaining
         )
         
-        logger.debug(f"Waiting {smart_interval}s until next check")
+        logger.info(f"Waiting {smart_interval}s until next check (min_interval={min_user_interval}s, users={active_users_count}, rate_remaining={rate_limiter.remaining})")
         await asyncio.sleep(smart_interval)
 
 
