@@ -143,7 +143,7 @@ class FreelancehuntAPI:
         data = await self._make_request("/projects", params)
         projects = data.get("data", [])
         
-        logger.info(f"Received {len(projects)} projects from API")
+        # logger.info(f"Received {len(projects)} projects from API")
         
         return projects
     

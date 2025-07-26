@@ -89,7 +89,7 @@ class ProjectService:
         # Get projects from API
         projects = await api_client.get_projects(user_filters)
         if not projects:
-            logger.warning(f"No projects received from API for user {user_id}")
+            # logger.warning(f"No projects received from API for user {user_id}")
             return
         
         logger.info(f"Processing {len(projects)} projects for user {user_id}")
