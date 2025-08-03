@@ -95,7 +95,7 @@ async def cmd_start(message: Message):
         "/interval &lt;секунди&gt; - змінити інтервал перевірки\n"
         "/status - статус бота та API\n"
         "/stop - зупинити сповіщення"
-        "/id_list - Список ID Категорі\n",
+        "/id_list - Список ID Категорій\n",
         parse_mode='HTML',
         disable_web_page_preview=True
     )
