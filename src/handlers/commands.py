@@ -299,6 +299,165 @@ async def cmd_employer_id(message: Message, command: CommandObject):
 #         await message.answer("❌ Произошла ошибка при получении навыков.")
 
 
+@router.message(Command("id_list"))
+async def cmd_id_list(message: Message):
+    """Show list of all category IDs."""
+    user_id = message.from_user.id
+    
+    # Check if user is active
+    if not user_manager.is_user_active(user_id):
+        await message.answer("❌ Спочатку активуйте бота командою /start", parse_mode='HTML', disable_web_page_preview=True)
+        return
+    
+    # Category IDs list
+    categories = [
+        "1 - PHP",
+        "2 - C & C++",
+        "6 - Linux & Unix",
+        "7 - Windows",
+        "13 - Java",
+        "14 - Search Engine Optimization (SEO)",
+        "17 - Logo Design",
+        "18 - Photo Processing",
+        "22 - Python",
+        "24 - C#",
+        "28 - Javascript and Typescript",
+        "37 - Text Translation",
+        "38 - Articles & Blog Posts",
+        "39 - System & Network Administration",
+        "41 - Banners",
+        "42 - Interface Design (UI/UX)",
+        "43 - Web Design",
+        "45 - Website Maintenance",
+        "57 - Testing & QA",
+        "58 - Vector Graphics",
+        "59 - 3D Modeling",
+        "64 - Object Design",
+        "65 - Cybersecurity & Data Protection",
+        "68 - Online Stores & E-commerce",
+        "75 - Print Design",
+        "76 - Copywriting",
+        "77 - Corporate Style",
+        "78 - Content Management Systems",
+        "79 - English",
+        "80 - German",
+        "83 - Software & Server Configuration",
+        "84 - Spanish",
+        "86 - Databases & SQL",
+        "88 - Gaming Apps",
+        "89 - Project Management",
+        "90 - Illustrations & Drawings",
+        "91 - Animation",
+        "93 - Icons & Pixel Graphics",
+        "94 - Marketing Research",
+        "95 - Tuition",
+        "96 - Website Development",
+        "97 - Technical Documentation",
+        "99 - Web Programming",
+        "100 - Music",
+        "101 - Video Processing",
+        "102 - Audio Processing",
+        "103 - Desktop Apps",
+        "104 - Content Management",
+        "106 - Interior Design",
+        "107 - Landscape Projects & Design",
+        "108 - Architectural Design",
+        "109 - Outdoor Advertising",
+        "113 - Audio & Video Editing",
+        "114 - Presentations",
+        "117 - Packaging and label design",
+        "120 - Apps for iOS (iPhone and iPad)",
+        "121 - App Development for Android",
+        "122 - Transcribing",
+        "123 - Naming & Slogans",
+        "124 - HTML & CSS",
+        "125 - Rewriting",
+        "127 - Contextual Advertising",
+        "129 - Payment Systems Integration",
+        "131 - Social Media Marketing (SMM)",
+        "132 - Exhibition Booth Design",
+        "133 - Social Media Advertising",
+        "134 - Website SEO Audit",
+        "135 - Search Engine Reputation Management (SERM)",
+        "136 - Email Marketing",
+        "138 - Advertising",
+        "139 - Photography",
+        "140 - Poems, Songs & Prose",
+        "141 - Artwork",
+        "143 - Speaker & Voice Services",
+        "144 - Video Advertising",
+        "145 - Teaser Advertisements",
+        "147 - Drawings & Diagrams",
+        "148 - Engineering",
+        "149 - Accounting Services",
+        "150 - Client Management & CRM",
+        "151 - Social Media Page Design",
+        "152 - Type & Font Design",
+        "153 - Legal Services",
+        "154 - Consulting",
+        "156 - Business Card Design",
+        "157 - Software, Website & Game Localization",
+        "158 - French",
+        "159 - Recruitment (HR)",
+        "161 - Video Recording",
+        "162 - Lead Generation & Sales",
+        "163 - Script Writing",
+        "164 - Industrial Design",
+        "168 - Text Editing & Proofreading",
+        "169 - Data Parsing",
+        "170 - Information Gathering",
+        "171 - Customer Support",
+        "172 - Infographics",
+        "175 - AI & Machine Learning",
+        "176 - Embedded Systems & Microcontrollers",
+        "178 - Data Processing",
+        "179 - Mobile Apps Design",
+        "180 - Bot Development",
+        "181 - DevOps",
+        "182 - Cryptocurrency & Blockchain",
+        "183 - Hybrid Mobile Apps",
+        "184 - Link Building",
+        "185 - AR & VR Development",
+        "186 - AI Art",
+        "187 - VR & AR Design",
+        "188 - Mechanical Engineering & Instrument Making",
+        "189 - Enterprise Resource Planning (ERP)",
+        "190 - AI Consulting",
+        "191 - AI Speech & Audio Generation",
+        "192 - Video Creation by Artificial Intelligence",
+        "193 - App Store Optimization (ASO)",
+        "194 - Public Relations (PR)",
+        "195 - Polish",
+        "196 - Ukrainian",
+        "197 - AI Content Creation",
+        "198 - Clothing design"
+    ]
+    
+    # Split categories into chunks to avoid message length limit
+    chunk_size = 30
+    chunks = [categories[i:i + chunk_size] for i in range(0, len(categories), chunk_size)]
+    
+    # Send header message
+    await message.answer(
+        "📋 <b>Список ID категорій FreelanceHunt:</b>\n\n"
+        "Використовуйте ці ID для команди /skill_id\n"
+        "Наприклад: <code>/skill_id 22</code> для Python",
+        parse_mode='HTML',
+        disable_web_page_preview=True
+    )
+    
+    # Send categories in chunks
+    for i, chunk in enumerate(chunks, 1):
+        chunk_text = "\n".join(chunk)
+        header = f"📄 <b>Частина {i}/{len(chunks)}:</b>\n\n"
+        
+        await message.answer(
+            f"{header}<code>{chunk_text}</code>",
+            parse_mode='HTML',
+            disable_web_page_preview=True
+        )
+
+
 @router.message(Command("status"))
 async def cmd_status(message: Message):
     """Handle /status command - show bot and API status."""
