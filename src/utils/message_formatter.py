@@ -6,7 +6,8 @@ Formats project data into Telegram messages.
 
 import re
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +67,9 @@ class MessageFormatter:
         # Add login if available
         if login:
             if name:
-                return f"{name} (@{login})"
+                return f"{name} (<tg-spoiler>@{login}</tg-spoiler>)"
             else:
-                return f"@{login}"
+                return f"<tg-spoiler>@{login}</tg-spoiler>"
         
         return name if name else ""
     
@@ -91,8 +92,8 @@ class MessageFormatter:
         return f"https://freelancehunt.com/project/{project_id}.html"
     
     @staticmethod
-    def format_project_message(project: Dict[str, Any], show_skill_ids: bool = False) -> str:
-        """Format project data into a Telegram message."""
+    def format_project_message(project: Dict[str, Any], show_skill_ids: bool = False) -> Tuple[str, InlineKeyboardMarkup]:
+        """Format project data into a Telegram message with inline keyboard."""
         attributes = project.get("attributes", {})
         
         # Basic project info
@@ -118,12 +119,12 @@ class MessageFormatter:
         
         # Build message
         message_text = (
-            f"<b>🔥 Новий проект:</b> {title}\n\n"
+            f"<b>🚨 НОВИЙ ПРОЕКТ: {title}</b>\n\n"
             f"<b>Опис:</b> {description[:200]}...\n\n"
         )
         
         if budget_text:
-            message_text += f"<b>Бюджет:</b> {budget_text}\n"
+            message_text += f"<b>💰Бюджет:</b> {budget_text}\n"
         
         if skills_text:
             message_text += f"<b>Навички:</b> {skills_text}\n"
@@ -137,9 +138,12 @@ class MessageFormatter:
         if employer_name:
             message_text += f"<b>Замовник:</b> {employer_name}\n"
         
-        message_text += f"\n<b>🔗 <a href='{project_url}'>Відкрити проект</a></b>"
+        # Create inline keyboard with project button
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 ВІДКРИТИ ПРОЕКТ", url=project_url)]
+        ])
         
-        return message_text
+        return message_text, keyboard
 
 
 # Global message formatter instance

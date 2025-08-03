@@ -87,10 +87,11 @@ async def cmd_start(message: Message):
     await user_manager.activate_user(user_id, user_info)
     
     await message.answer(
-        "✅ Сповіщення про нові проекти активовано!\n\n"
-        f"Інтервал перевірки: {user_manager.get_user_interval(user_id)} секунд\n"
-        f"Фільтр: {user_manager.get_filter_description(user_id)}\n\n"
-        "Використовуйте команди:\n"
+        "🚨 Сповіщення про нові проекти <b>АКТИВОВАНО!</b>\n\n"
+        f"Інтервал перевірки: <b>{user_manager.get_user_interval(user_id)} секунд</b>\n"
+        f"Фільтр: <b>{user_manager.get_filter_description(user_id)}</b>\n\n"
+        "<b>Команди:</b>\n"
+        "/start - Запустити сповіщення\n"
         "/filter - обрати фільтр проектів\n"
         "/interval &lt;секунди&gt; - змінити інтервал перевірки\n"
         "/status - статус бота та API\n"

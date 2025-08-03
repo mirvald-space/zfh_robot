@@ -271,7 +271,7 @@ class UserManager:
         filters = self.get_user_filters(user_id)
         
         if not filters:
-            return "без фільтрів (усі проекти)"
+            return "<b>Без фільтрів (усі проекти)</b>"
         
         descriptions = []
         

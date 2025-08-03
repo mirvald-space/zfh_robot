@@ -122,7 +122,7 @@ class ProjectService:
         # Format and send message
         # Тимчасово відключено відображення skill_ids оскільки фільтр only_my_skills недоступний
         show_skill_ids = False  # user_filters.get("only_my_skills") == "1"
-        message_text = message_formatter.format_project_message(project, show_skill_ids)
+        message_text, keyboard = message_formatter.format_project_message(project, show_skill_ids)
         
         try:
             logger.info(f"Sending project {project_id} to user {user_id}")
@@ -130,7 +130,8 @@ class ProjectService:
                 user_id, 
                 message_text, 
                 parse_mode='HTML',
-                disable_web_page_preview=True
+                disable_web_page_preview=True,
+                reply_markup=keyboard
             )
             logger.info(f"Successfully sent project {project_id} to user {user_id}")
         except Exception as e:
