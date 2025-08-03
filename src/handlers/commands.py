@@ -92,18 +92,14 @@ async def cmd_start(message: Message):
         f"Інтервал перевірки: <b>{user_manager.get_user_interval(user_id)} секунд</b>\n"
         f"Фільтр: <b>{user_manager.get_filter_description(user_id)}</b>\n\n"
         "<b>🪄Команди:</b>\n"
-        "<code>/start</code> - Запустити сповіщення\n"
-        "<code>/filter</code> - обрати фільтр проектів\n"
-        "<code>/interval &lt;секунди&gt;</code> - змінити інтервал перевірки\n"
-        "<code>/status</code> - статус бота та API\n"
-        "<code>/stop</code> - зупинити сповіщення\n"
-        "<code>/id_list</code> - Список ID Категорій\n\n"
-        "<b>🎁 Інші безкоштовні боти:</b>\n"
-        "@Vidzillabot - викачує відео з Insta/TikTok/YouTube\n"
-        "@Ninjatrbot - АІ-перекладач \n"
-        "@polishdom_bot - вивчення польської + Карта Поляка\n"
-        "@DockMixAIbot - чат із Claude та ChatGPT\n"
-        "@voiceletbot - голосові в текст\n",
+        "<b>/start</b> - Запустити сповіщення\n"
+        "<b>/filter</b> - обрати фільтр проектів\n"
+        "<b>/interval &lt;секунди&gt;</b> - змінити інтервал перевірки\n"
+        "<b>/status</b> - статус бота та API\n"
+        "<b>/stop</b> - зупинити сповіщення\n"
+        "<b>/id_list</b> - Список ID Категорій\n\n"
+        "<b>🎁 Інші боти:</b>\n"
+        "<b>/free_bots</b> - Переглянути безкоштовні боти\n",
         parse_mode='HTML',
         disable_web_page_preview=True
     )
@@ -112,6 +108,21 @@ async def cmd_start(message: Message):
     if project_service and not project_service.is_running:
         import asyncio
         asyncio.create_task(project_service.start_monitoring())
+
+
+@router.message(Command("free_bots"))
+async def cmd_free_bots(message: Message):
+    """Handle /free_bots command - show list of free bots."""
+    await message.answer(
+        "<b>🎁 Інші безкоштовні боти:</b>\n\n"
+        "@Vidzillabot - викачує відео з Insta/TikTok/YouTube\n"
+        "@Ninjatrbot - АІ-перекладач \n"
+        "@polishdom_bot - вивчення польської + Карта Поляка\n"
+        "@DockMixAIbot - чат із Claude та ChatGPT\n"
+        "@voiceletbot - голосові в текст\n",
+        parse_mode='HTML',
+        disable_web_page_preview=True
+    )
 
 
 @router.message(Command("stop"))
