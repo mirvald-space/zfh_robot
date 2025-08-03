@@ -92,18 +92,18 @@ async def cmd_start(message: Message):
         f"Інтервал перевірки: <b>{user_manager.get_user_interval(user_id)} секунд</b>\n"
         f"Фільтр: <b>{user_manager.get_filter_description(user_id)}</b>\n\n"
         "<b>🪄Команди:</b>\n"
-        "/start - Запустити сповіщення\n"
-        "/filter - обрати фільтр проектів\n"
-        "/interval &lt;секунди&gt; - змінити інтервал перевірки\n"
-        "/status - статус бота та API\n"
-        "/stop - зупинити сповіщення\n"
-        "/id_list - Список ID Категорій\n\n"
+        "<code>/start</code> - Запустити сповіщення\n"
+        "<code>/filter</code> - обрати фільтр проектів\n"
+        "<code>/interval &lt;секунди&gt;</code> - змінити інтервал перевірки\n"
+        "<code>/status</code> - статус бота та API\n"
+        "<code>/stop</code> - зупинити сповіщення\n"
+        "<code>/id_list</code> - Список ID Категорій\n\n"
         "<b>🎁 Інші безкоштовні боти:</b>\n"
-        "📱 @Vidzillabot - викачує відео з Insta/TikTok/YouTube\n"
-        "🌐 @Ninjatrbot - АІ-перекладач \n"
-        "🇵🇱 @polishdom_bot - вивчення польської + Карта Поляка\n"
-        "💬 @DockMixAIbot - чат із Claude та ChatGPT\n"
-        "🎤 @voiceletbot - голосові в текст\n",
+        "@Vidzillabot - викачує відео з Insta/TikTok/YouTube\n"
+        "@Ninjatrbot - АІ-перекладач \n"
+        "@polishdom_bot - вивчення польської + Карта Поляка\n"
+        "@DockMixAIbot - чат із Claude та ChatGPT\n"
+        "@voiceletbot - голосові в текст\n",
         parse_mode='HTML',
         disable_web_page_preview=True
     )
@@ -450,7 +450,7 @@ async def cmd_id_list(message: Message):
     # Send header message
     await message.answer(
         "📋 <b>Список ID категорій FreelanceHunt:</b>\n\n"
-        "Використовуйте ці ID для команди /skill_id\n"
+        "Використовуйте ці ID для команди <code>/skill_id</code>\n"
         "Наприклад: <code>/skill_id 22</code> для Python",
         parse_mode='HTML',
         disable_web_page_preview=True
