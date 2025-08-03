@@ -67,7 +67,7 @@ class MessageFormatter:
         # Add login if available
         if login:
             if name:
-                return f"{name} (<tg-spoiler>@{login}</tg-spoiler>)"
+                return f"{name} <tg-spoiler>@{login}</tg-spoiler>"
             else:
                 return f"<tg-spoiler>@{login}</tg-spoiler>"
         

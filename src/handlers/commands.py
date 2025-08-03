@@ -113,9 +113,10 @@ async def cmd_stop(message: Message):
     user_id = message.from_user.id
     
     if await user_manager.deactivate_user(user_id):
-        await message.answer("❌ Сповіщення про нові проекти зупинено.", parse_mode='HTML', disable_web_page_preview=True)
+        await message.answer("❌ Сповіщення про нові проекти <b>ЗУПИНЕНО!</b>\n\n"
+                            "Ви можете знову активувати сповіщення командою <b>/start</b>", parse_mode='HTML', disable_web_page_preview=True)
     else:
-        await message.answer("Сповіщення вже зупинено.", parse_mode='HTML', disable_web_page_preview=True)
+        await message.answer("ℹ Сповіщення вже <b>ЗУПИНЕНО!</b>", parse_mode='HTML', disable_web_page_preview=True)
 
 
 @router.message(Command("interval"))
@@ -126,10 +127,10 @@ async def cmd_interval(message: Message, command: CommandObject):
     if not command.args:
         current_interval = user_manager.get_user_interval(user_id)
         await message.answer(
-            f"Поточний інтервал перевірки: {current_interval} секунд\n"
-            f"Для зміни використовуйте команду /interval &lt;секунди&gt;\n"
-            f"Мінімальний інтервал: {config.MIN_CHECK_INTERVAL} секунд\n"
-            f"Максимальний інтервал: {config.MAX_CHECK_INTERVAL} секунд",
+            f"Поточний інтервал перевірки: <b>{current_interval} секунд</b>\n"
+            f"Для зміни використовуйте команду: <b>/interval &lt;секунди&gt;</b>\n"
+            f"Мінімальний інтервал: <b>{config.MIN_CHECK_INTERVAL} секунд</b>\n"
+            f"Максимальний інтервал: <b>{config.MAX_CHECK_INTERVAL} секунд</b>",
             parse_mode='HTML',
             disable_web_page_preview=True
         )
@@ -502,16 +503,16 @@ async def cmd_status(message: Message):
     
     status_text = (
         f"📊 <b>Статус бота</b>\n\n"
-        f"👤 <b>Користувач:</b> {name}\n"
-        f"🆔 <b>Username:</b> @{username}\n"
-        f"🔔 Сповіщення: {'✅ Активні' if is_active else '❌ Зупинено'}\n"
-        f"⏱ Інтервал перевірки: {current_interval} секунд\n"
-        f"🔍 Фільтр: {filter_desc}\n"
-        f"📅 Дата реєстрації: {created_at_str}\n\n"
+        f"Користувач: <b>{name}</b>\n"
+        f"Username: <b>@{username}</b>\n"
+        f"Сповіщення: <b>{'✅ Активні' if is_active else '❌ Зупинено'}</b>\n"
+        f"Інтервал перевірки: <b>{current_interval} секунд</b>\n"
+        f"Фільтр: <b>{filter_desc}</b>\n"
+        f"Дата реєстрації: <b>{created_at_str}</b>\n\n"
         f"📡 <b>Загальна статистика</b>\n"
-        f"👥 Активних користувачів: {stats['active_users']}\n"
-        f"👤 Нових користувачів за 24г: {new_users_24h}\n"
-        f"📝 Надіслано проектів: {stats['sent_projects']}"
+        f"Активних користувачів: <b>{stats['active_users']}</b>\n"
+        f"Нових користувачів за 24г: <b>{new_users_24h}</b>\n"
+        f"Всього надіслано проектів: <b>{stats['sent_projects']}</b>"
     )
     
     await message.answer(status_text, parse_mode='HTML', disable_web_page_preview=True)
