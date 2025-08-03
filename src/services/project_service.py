@@ -38,20 +38,16 @@ class ProjectService:
         if not user_manager._loaded:
             await user_manager.load_data_from_db()
         
-        # Сразу запускаем первую проверку проектов, не ждем таймера
-        logger.info("Running initial project check")
-        await self._check_projects_for_all_users()
-        
         logger.info("Starting periodic project monitoring loop")
         
         while self.is_running:
+            # Calculate smart interval and wait first
+            await self._wait_smart_interval()
+            
             try:
                 await self._check_projects_for_all_users()
             except Exception as e:
                 logger.error(f"Error in project monitoring loop: {e}", exc_info=True)
-            
-            # Calculate smart interval and wait
-            await self._wait_smart_interval()
     
     def stop_monitoring(self) -> None:
         """Stop the project monitoring loop."""
