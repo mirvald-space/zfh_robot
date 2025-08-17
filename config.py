@@ -54,59 +54,11 @@ RATE_LIMIT_WARNING_THRESHOLD = int(os.getenv("RATE_LIMIT_WARNING_THRESHOLD", "20
 RATE_LIMIT_CRITICAL_THRESHOLD = int(os.getenv("RATE_LIMIT_CRITICAL_THRESHOLD", "10"))
 
 # ============================================================================
-# WEBHOOK SETTINGS
-# ============================================================================
-
-# Webhook host (for production use your domain, for dev use ngrok URL)
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "localhost")
-
-# Webhook path
-WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
-
-# Build webhook URL - check if host already has protocol
-if WEBHOOK_HOST.startswith(('http://', 'https://')):
-    WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-else:
-    WEBHOOK_URL = f"https://{WEBHOOK_HOST}{WEBHOOK_PATH}"
-
-# ============================================================================
-# WEB APPLICATION SETTINGS
-# ============================================================================
-
-# Web app host (0.0.0.0 for production, localhost for dev)
-WEBAPP_HOST = os.getenv("WEBAPP_HOST", "0.0.0.0")
-
-# Web app port
-WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", "3000"))
-
-# ============================================================================
 # ENVIRONMENT SETTINGS
 # ============================================================================
 
-# Development mode (skip webhook setup, use polling instead)
-DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
-
-# Production mode detection
-IS_PRODUCTION = not DEV_MODE and os.getenv("RENDER_EXTERNAL_URL") is not None
-
 # Logging level
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-
-# ============================================================================
-# PRODUCTION OVERRIDES
-# ============================================================================
-
-# Override settings for production deployment (e.g., Render.com)
-if os.getenv('RENDER_EXTERNAL_URL'):
-    # Use Render's external URL for webhook
-    WEBHOOK_HOST = os.getenv('RENDER_EXTERNAL_URL').rstrip('/')
-    WEBAPP_PORT = 10000  # Render uses port 10000
-    IS_PRODUCTION = True
-    DEV_MODE = False
-    WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-    
-    logger.info("Production environment detected (Render)")
-    logger.info(f"Using webhook URL: {WEBHOOK_URL}")
 
 # ============================================================================
 # VALIDATION

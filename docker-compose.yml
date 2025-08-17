@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  zfh_bot:
+    build: .
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      FREELANCEHUNT_TOKEN: ${FREELANCEHUNT_TOKEN}
+      MONGO_URI: ${MONGO_URI}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-zfh_robot}
+    restart: unless-stopped
